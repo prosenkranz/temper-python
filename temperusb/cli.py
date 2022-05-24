@@ -1,7 +1,9 @@
 # encoding: utf-8
 from __future__ import print_function, absolute_import
+from prometheus_client import start_http_server, Gauge
 import argparse
 import logging
+import time
 
 from .temper import TemperHandler
 
@@ -26,18 +28,20 @@ def parse_args():
                         help="Override auto-detected number of sensors on the device")
     parser.add_argument("-v", "--verbose", action='store_true',
                        help="Verbose: display all debug information")
+    parser.add_argument("--prometheus-exporter", dest='prometheus_exporter', action='store_true',
+                        help="Starts a foreground webserver that servers Prometheus " +
+                        "Metrics instead of printing them to console")
     args = parser.parse_args()
 
     return args
 
 
-def main():
-    args = parse_args()
-    quiet = args.celsius or args.fahrenheit or args.humidity
-    lvl = logging.ERROR if quiet else logging.WARNING
-    if args.verbose:
-        lvl = logging.DEBUG
-    logging.basicConfig(level = lvl)
+def get_quiet(args):
+    return args.celsius or args.fahrenheit or args.humidity
+
+
+def sample_sensors(args):
+    quiet = get_quiet(args)
 
     th = TemperHandler()
     devs = th.get_devices()
@@ -67,6 +71,14 @@ def main():
                 pass
             combinations[k] = c
         readings.append(combinations)
+
+    return readings
+
+
+def main_simple(args):
+    quiet = get_quiet(args)
+
+    readings = sample_sensors(args)
 
     for i, reading in enumerate(readings):
         output = ''
@@ -104,6 +116,48 @@ def main():
 
             output = 'Device #%i%s: %s %s' % (i, portinfo, tempinfo, huminfo)
         print(output)
+
+
+def main_prometheus_exporter(args):
+    start_http_server(8000)
+
+    # Register metrics
+    temperature_c_gauge = Gauge('temper_temperature_c', 'Temperature in Degrees Celsius', ['device', 'sensor'])
+    humidity_pc_gauge = Gauge('temper_humidity_pc', 'Humidity in percent', ['device', 'sensor'])
+
+    while True:
+        print("Sampling...")
+
+        readings = sample_sensors(args)
+
+        for i, reading in enumerate(readings):
+            for sensor in sorted(reading):
+                temperature_c_gauge.labels(device=str(i), sensor=str(sensor)).set(reading[sensor]['temperature_c'])
+
+                try:
+                    humidity_pc = reading[sensor]['humidity_pc']
+                    humidity_pc_gauge.labels(device=str(i), sensor=str(sensor)).set(humidity_pc)
+                except:
+                    pass
+
+        time.sleep(10)
+
+
+
+
+
+def main():
+    args = parse_args()
+    quiet = get_quiet(args)
+    lvl = logging.ERROR if quiet else logging.WARNING
+    if args.verbose:
+        lvl = logging.DEBUG
+    logging.basicConfig(level = lvl)
+
+    if args.prometheus_exporter:
+        main_prometheus_exporter(args)
+    else:
+        main_simple(args)
 
 
 if __name__ == '__main__':

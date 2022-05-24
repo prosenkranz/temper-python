@@ -1,0 +1,10 @@
+services:
+  temper-prometheus-exporter:
+    build: .
+    ports:
+      - "127.0.0.1:9827:8000"
+    device_cgroup_rules:
+      # Access to all Host USB devices
+      # see https://www.kernel.org/doc/Documentation/cgroup-v1/devices.txt
+      # .. and https://github.com/torvalds/linux/blob/master/Documentation/admin-guide/devices.txt
+      - 'a 180:* rmw'

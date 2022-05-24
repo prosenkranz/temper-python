@@ -13,6 +13,7 @@ setup(
     packages=['temperusb'],
     install_requires=[
         'pyusb>=1.0.0rc1',
+        'prometheus-client>=0.14.1'
     ],
     entry_points={
         'console_scripts': [
