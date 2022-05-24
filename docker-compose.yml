@@ -3,6 +3,8 @@ services:
     build: .
     ports:
       - "127.0.0.1:9827:8000"
+    volumes:
+      - /dev:/dev
     device_cgroup_rules:
       # Access to all Host USB devices
       # see https://www.kernel.org/doc/Documentation/cgroup-v1/devices.txt
